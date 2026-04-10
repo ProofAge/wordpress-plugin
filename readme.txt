@@ -34,12 +34,12 @@ External service disclosure:
 
 Supported browser flows:
 
+* open the hosted verification in an iframe modal on the current page
 * redirect in the current window
 * open the hosted verification in a new tab
 
 This version intentionally does not support:
 
-* hosted iframe or modal embedding
 * a custom in-page ProofAge capture UI
 * theme-specific quick-view integrations beyond the generic add-to-cart interception hooks
 
@@ -83,13 +83,14 @@ Yes. For WooCommerce orders the plugin stores a ProofAge verification snapshot i
 
 = Does this plugin embed ProofAge in an iframe or modal? =
 
-No. This version uses the hosted ProofAge flow only.
+Yes. Hosted verification can open in an iframe modal, in the current window, or in a new tab.
 
 == Changelog ==
 
 = 0.1.0 =
 
 * Initial release.
+* Added iframe modal launch mode for hosted verification.
 * Added WordPress and WooCommerce protection rules.
 * Added hosted verification launch flows for redirect and new tab.
 * Added WooCommerce order verification snapshot in admin order details.

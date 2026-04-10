@@ -211,7 +211,7 @@ final class SettingsRegistrar
                 'section' => 'proofage_behavior',
                 'type' => 'select',
                 'options' => Options::supportedLaunchModes(),
-                'description' => __('Hosted modal or iframe is intentionally not enabled in this version.', 'proofage-age-verification'),
+                'description' => __('Choose whether hosted verification opens in an iframe modal, the current window, or a new tab.', 'proofage-age-verification'),
             ],
             [
                 'key' => 'content_display_mode',

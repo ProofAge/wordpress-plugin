@@ -13,16 +13,14 @@ This plugin integrates the hosted ProofAge verification flow with WordPress and 
 
 ## Supported Browser Flows
 
+- `iframe`: opens the hosted ProofAge verification inside a modal iframe on the current page.
 - `redirect`: opens the hosted ProofAge verification in the current browser tab.
 - `new_tab`: opens the hosted ProofAge verification in a new browser tab.
 
 ## Not Supported in v1
 
-- Hosted iframe or modal embedding.
 - A custom in-page ProofAge capture UI.
 - Theme-specific quick-view integrations beyond the generic add-to-cart interception hooks.
-
-These items were intentionally deferred until ProofAge confirms the hosted flow's iframe and callback guarantees.
 
 ## Installation
 
@@ -87,7 +85,6 @@ The plugin appends an `origin` query parameter automatically for each verificati
 
 - WooCommerce is not present in the current local `wordpress` tree, so Woo-specific runtime behavior still needs testing in a real WooCommerce installation.
 - The plugin does not yet implement uninstall-time cleanup for user meta and transients beyond the main option.
-- Hosted iframe/modal support is intentionally disabled in this version.
 - Browser automation coverage for popup/new-tab return flows has not been added yet.
 
 ## Verification

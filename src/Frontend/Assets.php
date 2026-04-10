@@ -49,6 +49,10 @@ final class Assets
             'messages' => [
                 'success' => LocalizedGateTexts::get('success_message'),
                 'error' => LocalizedGateTexts::get('error_message'),
+                'iframeTitle' => LocalizedGateTexts::get('gate_title'),
+                'iframeHelp' => __('If the verification form does not load, open it in a new tab.', 'proofage-age-verification'),
+                'iframeOpenFallback' => __('Open in a new tab', 'proofage-age-verification'),
+                'iframeClose' => __('Close', 'proofage-age-verification'),
             ],
         ]);
 

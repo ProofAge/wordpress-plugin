@@ -124,6 +124,7 @@ final class Options
     public static function supportedLaunchModes(): array
     {
         return [
+            'iframe' => 'Open in an iframe modal',
             'redirect' => 'Redirect in current window',
             'new_tab' => 'Open in a new tab',
         ];

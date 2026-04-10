@@ -13,6 +13,111 @@
         return documentLanguage || config.language || '';
     };
 
+    let verificationModal = null;
+    let verificationPollIntervalId = null;
+    let verificationModalCloseTimeoutId = null;
+
+    const getVerificationModal = () => {
+        if (verificationModal) {
+            return verificationModal;
+        }
+
+        const root = document.createElement('div');
+        root.className = 'proofage-verification-modal';
+        root.hidden = true;
+
+        const dialog = document.createElement('div');
+        dialog.className = 'proofage-verification-modal__dialog';
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        dialog.setAttribute('aria-labelledby', 'proofage-verification-modal-title');
+
+        const iframe = document.createElement('iframe');
+        iframe.className = 'proofage-verification-modal__frame';
+        iframe.title = config.messages.iframeTitle || 'Verification';
+        iframe.setAttribute('allow', 'camera *; microphone *; fullscreen *');
+        iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        dialog.append(iframe);
+        root.append(dialog);
+
+        root.addEventListener('click', (event) => {
+            if (event.target === root) {
+                closeVerificationModal();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !root.hidden) {
+                closeVerificationModal();
+            }
+        });
+
+        document.body.append(root);
+
+        verificationModal = {
+            root,
+            iframe,
+            origin: '',
+        };
+
+        return verificationModal;
+    };
+
+    const openVerificationModal = (url) => {
+        const modal = getVerificationModal();
+        stopVerificationModalAutoClose();
+        modal.origin = new URL(url, window.location.href).origin;
+        modal.iframe.src = url;
+        modal.root.hidden = false;
+        document.body.classList.add('proofage-verification-modal-open');
+    };
+
+    const closeVerificationModal = ({ stopPolling = true } = {}) => {
+        if (!verificationModal) {
+            return;
+        }
+
+        stopVerificationModalAutoClose();
+
+        if (stopPolling) {
+            stopVerificationPolling();
+        }
+
+        verificationModal.root.hidden = true;
+        verificationModal.iframe.src = 'about:blank';
+        verificationModal.origin = '';
+        document.body.classList.remove('proofage-verification-modal-open');
+    };
+
+    const stopVerificationPolling = () => {
+        if (verificationPollIntervalId === null) {
+            return;
+        }
+
+        window.clearInterval(verificationPollIntervalId);
+        verificationPollIntervalId = null;
+    };
+
+    const stopVerificationModalAutoClose = () => {
+        if (verificationModalCloseTimeoutId === null) {
+            return;
+        }
+
+        window.clearTimeout(verificationModalCloseTimeoutId);
+        verificationModalCloseTimeoutId = null;
+    };
+
+    const scheduleVerificationModalClose = () => {
+        if (!verificationModal || verificationModal.root.hidden) {
+            return;
+        }
+
+        stopVerificationModalAutoClose();
+        verificationModalCloseTimeoutId = window.setTimeout(() => {
+            closeVerificationModal({ stopPolling: false });
+        }, 3000);
+    };
+
     const startVerification = async (returnUrl) => {
         const response = await fetch(config.sessionEndpoint, {
             method: 'POST',
@@ -65,8 +170,10 @@
             return;
         }
 
+        stopVerificationPolling();
+
         let attempts = 0;
-        const intervalId = window.setInterval(async () => {
+        verificationPollIntervalId = window.setInterval(async () => {
             attempts += 1;
 
             try {
@@ -78,7 +185,7 @@
 
                 if (!response.ok) {
                     if (attempts >= 30) {
-                        window.clearInterval(intervalId);
+                        stopVerificationPolling();
                     }
 
                     return;
@@ -87,14 +194,16 @@
                 const payload = await response.json();
 
                 if (payload.verified) {
-                    window.clearInterval(intervalId);
+                    stopVerificationPolling();
+                    closeVerificationModal();
                     resumePendingAction(returnUrl);
                     return;
                 }
 
                 if (terminalFailureStatuses.has(payload.state?.status)) {
-                    window.clearInterval(intervalId);
+                    stopVerificationPolling();
                     localStorage.removeItem(pendingVerificationKey);
+                    closeVerificationModal();
 
                     const failureUrl = new URL(stripProofAgeStatus(returnUrl || window.location.href), window.location.origin);
                     failureUrl.searchParams.set('proofage_status', payload.state.status);
@@ -103,13 +212,19 @@
                 }
             } catch (_error) {
                 if (attempts >= 30) {
-                    window.clearInterval(intervalId);
+                    stopVerificationPolling();
                 }
             }
         }, 2000);
     };
 
     const launchHostedFlow = (payload) => {
+        if (payload.launch_mode === 'iframe') {
+            openVerificationModal(payload.url);
+            pollVerificationStatus(payload.verification_id, payload.state?.return_url || window.location.href);
+            return;
+        }
+
         if (payload.launch_mode === 'new_tab') {
             const popup = window.open(payload.url, '_blank');
 
@@ -190,6 +305,16 @@
     };
 
     window.addEventListener('message', (event) => {
+        if (
+            verificationModal
+            && verificationModal.origin !== ''
+            && event.origin === verificationModal.origin
+            && event.data?.type === 'KYC_COMPLETE'
+        ) {
+            scheduleVerificationModalClose();
+            return;
+        }
+
         if (event.origin !== window.location.origin) {
             return;
         }
@@ -199,11 +324,19 @@
         }
 
         if (event.data.status === 'approved') {
+            closeVerificationModal();
             resumePendingAction(event.data.redirectUrl);
             return;
         }
 
         if (terminalFailureStatuses.has(event.data.status) && event.data.redirectUrl) {
+            closeVerificationModal();
+            window.location.assign(event.data.redirectUrl);
+            return;
+        }
+
+        if (event.data.redirectUrl) {
+            closeVerificationModal();
             window.location.assign(event.data.redirectUrl);
         }
     });

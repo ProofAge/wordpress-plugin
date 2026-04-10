@@ -80,6 +80,11 @@ final class ReturnController
                         redirectUrl: <?php echo wp_json_encode($redirectUrl); ?>,
                     };
 
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage(payload, window.location.origin);
+                        return;
+                    }
+
                     if (window.opener) {
                         window.opener.postMessage(payload, window.location.origin);
 
