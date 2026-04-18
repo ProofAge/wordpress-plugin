@@ -1,6 +1,14 @@
 # ProofAge Age Verification for WordPress
 
-This plugin integrates the hosted ProofAge verification flow with WordPress and WooCommerce.
+**Platform:** https://proofage.xyz | **WordPress.org:** https://wordpress.org/plugins/proofage-age-verification/
+
+A WordPress plugin for integrating with the ProofAge API — age-gate your WooCommerce store and restrict access to age-sensitive pages without handling identity documents server-side.
+
+## About ProofAge
+
+ProofAge is an online age verification platform enabling websites to confirm users meet minimum age requirements through a hosted, privacy-focused KYC process — without server-side document handling. It supports alcohol/tobacco/cannabis commerce, adult content platforms, gambling sites, and age-restricted subscriptions.
+
+This plugin provides a first-class WordPress and WooCommerce integration: an admin settings page with product and category targeting, three hosted-flow launch modes (iframe modal, redirect, new tab), HMAC-signed webhook handling, and multilingual support via Polylang and WPML.
 
 ## What It Does
 
@@ -93,3 +101,22 @@ The current implementation includes focused Pest tests for:
 - webhook signature verification
 - approval/session binding
 - authenticated session confirmation rules
+
+## Additional Resources
+
+- **Platform:** https://proofage.xyz
+- **Live Demo:** https://demo.proofage.xyz
+- **Node SDK:** `@proofage/node` on npm
+
+### Integrations for other platforms
+
+| Platform | Repository | Use-case |
+|---|---|---|
+| **Node.js** | [ProofAge/node-client](https://github.com/ProofAge/node-client) | Node.js age verification client — HMAC-signed API calls, webhook verification for Express, Hono, Next.js and other Node.js frameworks |
+| **WordPress** | this repo | Age gate plugin for WordPress — WooCommerce age verification, age-restricted pages, adult content gating |
+| **Laravel** | [ProofAge/laravel-client](https://github.com/ProofAge/laravel-client) | Laravel age verification client — HMAC-signed API calls, webhook handling, middleware for age-restricted routes |
+| **Next.js** | [ProofAge/demo](https://github.com/ProofAge/demo) | Full-stack age verification demo with JS SDK, server routes, and webhook receiver |
+
+## License
+
+The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
