@@ -12,6 +12,8 @@ if (! defined('ABSPATH')) {
 
 final class ReturnController
 {
+    private const RETURN_SCRIPT_HANDLE = 'proofage-age-verification-return';
+
     public function __construct(
         private readonly SessionManager $sessionManager,
         private readonly ApiClient $apiClient,
@@ -74,6 +76,7 @@ final class ReturnController
 
         nocache_headers();
         status_header(200);
+        $this->enqueueReturnScript($status, $redirectUrl);
 
         ?>
         <!doctype html>
@@ -85,36 +88,34 @@ final class ReturnController
         </head>
         <body>
             <p><?php esc_html_e('Returning to the store…', 'proofage-age-verification'); ?></p>
-            <script>
-                (function () {
-                    const payload = {
-                        source: 'proofage-wordpress',
-                        status: <?php echo wp_json_encode($status); ?>,
-                        redirectUrl: <?php echo wp_json_encode($redirectUrl); ?>,
-                    };
-
-                    if (window.parent && window.parent !== window) {
-                        window.parent.postMessage(payload, window.location.origin);
-                        return;
-                    }
-
-                    if (window.opener) {
-                        window.opener.postMessage(payload, window.location.origin);
-
-                        if (payload.status === 'approved') {
-                            window.close();
-                            return;
-                        }
-                    }
-
-                    window.location.replace(payload.redirectUrl);
-                }());
-            </script>
+            <?php wp_print_scripts(self::RETURN_SCRIPT_HANDLE); ?>
         </body>
         </html>
         <?php
 
         exit;
+    }
+
+    private function enqueueReturnScript(string $status, string $redirectUrl): void
+    {
+        wp_register_script(
+            self::RETURN_SCRIPT_HANDLE,
+            PROOFAGE_WP_PLUGIN_URL . 'assets/js/return-handler.js',
+            [],
+            PROOFAGE_WP_PLUGIN_VERSION,
+            false
+        );
+
+        wp_add_inline_script(
+            self::RETURN_SCRIPT_HANDLE,
+            'window.ProofAgeReturnPage = ' . wp_json_encode([
+                'status' => $status,
+                'redirectUrl' => $redirectUrl,
+            ]) . ';',
+            'before'
+        );
+
+        wp_enqueue_script(self::RETURN_SCRIPT_HANDLE);
     }
 
     private function isTerminalFailureStatus(string $status): bool
