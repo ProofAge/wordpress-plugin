@@ -32,23 +32,27 @@
         dialog.setAttribute('aria-modal', 'true');
         dialog.setAttribute('aria-labelledby', 'proofage-verification-modal-title');
 
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'proofage-verification-modal__close';
+        closeButton.setAttribute('aria-label', config.messages.iframeClose || 'Close');
+        closeButton.textContent = '\u00d7';
+        closeButton.addEventListener('click', () => {
+            dismissVerificationModal();
+        });
+
         const iframe = document.createElement('iframe');
         iframe.className = 'proofage-verification-modal__frame';
         iframe.title = config.messages.iframeTitle || 'Verification';
         iframe.setAttribute('allow', 'camera *; microphone *; fullscreen *');
         iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        dialog.append(closeButton);
         dialog.append(iframe);
         root.append(dialog);
 
-        root.addEventListener('click', (event) => {
-            if (event.target === root) {
-                closeVerificationModal();
-            }
-        });
-
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && !root.hidden) {
-                closeVerificationModal();
+                dismissVerificationModal();
             }
         });
 
@@ -87,6 +91,19 @@
         verificationModal.iframe.src = 'about:blank';
         verificationModal.origin = '';
         document.body.classList.remove('proofage-verification-modal-open');
+    };
+
+    const clearPendingVerificationState = ({ clearPendingUrl = false } = {}) => {
+        localStorage.removeItem(pendingVerificationKey);
+
+        if (clearPendingUrl) {
+            localStorage.removeItem(pendingUrlKey);
+        }
+    };
+
+    const dismissVerificationModal = () => {
+        clearPendingVerificationState({ clearPendingUrl: true });
+        closeVerificationModal();
     };
 
     const stopVerificationPolling = () => {
@@ -202,7 +219,7 @@
 
                 if (terminalFailureStatuses.has(payload.state?.status)) {
                     stopVerificationPolling();
-                    localStorage.removeItem(pendingVerificationKey);
+                    clearPendingVerificationState();
                     closeVerificationModal();
 
                     const failureUrl = new URL(stripProofAgeStatus(returnUrl || window.location.href), window.location.origin);
@@ -284,12 +301,12 @@
 
         if (pendingUrl) {
             localStorage.removeItem(pendingUrlKey);
-            localStorage.removeItem(pendingVerificationKey);
+            clearPendingVerificationState();
             window.location.assign(pendingUrl);
             return;
         }
 
-        localStorage.removeItem(pendingVerificationKey);
+        clearPendingVerificationState();
 
         if (nextUrl !== stripProofAgeStatus(window.location.href)) {
             window.location.assign(nextUrl);

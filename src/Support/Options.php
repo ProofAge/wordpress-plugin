@@ -57,10 +57,10 @@ final class Options
             $existing = [];
         }
 
-        $secretKey = self::sanitizeText($input['secret_key'] ?? '');
+        $secretKey = self::sanitizeSecret($input['secret_key'] ?? '', true);
 
         if ($secretKey === '') {
-            $secretKey = self::sanitizeText($existing['secret_key'] ?? $defaults['secret_key']);
+            $secretKey = self::sanitizeSecret($existing['secret_key'] ?? $defaults['secret_key']);
         }
 
         $protectedCategoryIds = self::sanitizeIdList($input['protected_category_ids'] ?? ($existing['protected_category_ids'] ?? []));
@@ -224,6 +224,21 @@ final class Options
         }
 
         return trim(wp_strip_all_tags((string) $value));
+    }
+
+    private static function sanitizeSecret(mixed $value, bool $unslash = false): string
+    {
+        if (! is_scalar($value) && $value !== null) {
+            return '';
+        }
+
+        $secret = (string) $value;
+
+        if ($unslash && function_exists('wp_unslash')) {
+            $secret = wp_unslash($secret);
+        }
+
+        return $secret;
     }
 
     private static function sanitizeTextarea(mixed $value): string
