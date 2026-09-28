@@ -31,6 +31,7 @@ External service disclosure:
 * this plugin requires a ProofAge account and valid API credentials
 * it connects to the ProofAge API to create verifications, fetch verification status, and process signed webhook callbacks
 * when a shopper starts verification, the plugin sends limited verification request data to ProofAge, such as an external identifier, callback or return URL, supported storefront language, and verification-related metadata
+* each ProofAge API request identifies the plugin through an X-ProofAge-Sdk header and a User-Agent carrying the plugin, WordPress, PHP, and (when active) WooCommerce versions
 * the plugin stores limited verification state locally in WordPress and WooCommerce, including verification status, verification ID, external ID, return URL, timestamps, session token, and optional order verification metadata
 * ProofAge Privacy Policy: https://proofage.xyz/privacy
 * ProofAge Terms of Service: https://proofage.xyz/terms

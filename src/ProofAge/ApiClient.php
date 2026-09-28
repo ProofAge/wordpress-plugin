@@ -76,6 +76,7 @@ final class ApiClient
         $headers = [
             'Accept' => 'application/json',
             'X-API-Key' => $apiKey,
+            ClientIdentity::SDK_HEADER => ClientIdentity::sdkHeaderValue(),
         ];
 
         if ($body !== '') {
@@ -89,6 +90,7 @@ final class ApiClient
         $response = wp_remote_request(self::BASE_URL . $path, [
             'method' => $method,
             'timeout' => 15,
+            'user-agent' => ClientIdentity::userAgent(),
             'headers' => $headers,
             'body' => $body === '' ? null : $body,
         ]);
