@@ -43,6 +43,15 @@ final class WebhookController
             ], 400);
         }
 
+        // A correction of document fields (event "data.updated") is not a decision: the status in it
+        // is the current one, so acknowledge it and leave the stored session alone. The plugin keeps
+        // no document fields.
+        if (($payload['event'] ?? 'status.updated') === 'data.updated') {
+            return new WP_REST_Response([
+                'ok' => true,
+            ], 200);
+        }
+
         $verificationId = (string) ($payload['verification_id'] ?? '');
         $status = (string) ($payload['status'] ?? '');
 
