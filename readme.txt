@@ -4,7 +4,7 @@ Tags: age verification, age gate, woocommerce, checkout, ecommerce
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -95,6 +95,11 @@ Yes. Hosted verification can open in an iframe modal, in the current window, or 
 
 == Changelog ==
 
+= 0.2.0 =
+
+* Each ProofAge API request now identifies the plugin through an X-ProofAge-Sdk header and a User-Agent with the plugin, WordPress, PHP and (when active) WooCommerce versions.
+* A data.updated webhook (a correction of document fields, not a decision) is acknowledged without changing the verification session.
+
 = 0.1.0 =
 
 * Initial release.
@@ -105,6 +110,10 @@ Yes. Hosted verification can open in an iframe modal, in the current window, or 
 * Added storefront language passthrough for supported ProofAge SDK languages.
 
 == Upgrade Notice ==
+
+= 0.2.0 =
+
+Handles ProofAge's new data.updated webhook correctly and identifies the plugin to the ProofAge API.
 
 = 0.1.0 =
 
