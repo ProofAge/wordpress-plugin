@@ -11,7 +11,7 @@ if (! defined('ABSPATH')) {
 
 final class ApiClient
 {
-    private const BASE_URL = 'https://api.proofage.xyz';
+    private const BASE_URL = 'https://api.proofage.net';
 
     public function createVerification(
         string $externalId,
