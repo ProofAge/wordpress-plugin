@@ -2,7 +2,7 @@
 
 /**
  * Plugin Name: ProofAge Age Verification
- * Plugin URI: https://proofage.xyz/
+ * Plugin URI: https://proofage.net/
  * Description: Adds ProofAge-powered age verification to WordPress and WooCommerce storefronts.
  * Version: 0.2.1
  * Requires at least: 6.4

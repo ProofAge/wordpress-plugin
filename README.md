@@ -1,6 +1,6 @@
 # ProofAge Age Verification for WordPress
 
-**Platform:** https://proofage.xyz | **WordPress.org:** https://wordpress.org/plugins/proofage-age-verification/
+**Platform:** https://proofage.net | **WordPress.org:** https://wordpress.org/plugins/proofage-age-verification/
 
 A WordPress plugin for integrating with the ProofAge API — age-gate your WooCommerce store and restrict access to age-sensitive pages without handling identity documents server-side.
 
@@ -32,8 +32,8 @@ This plugin provides a first-class WordPress and WooCommerce integration: an adm
 - When a shopper starts verification, the plugin sends limited verification request data to ProofAge, such as an external identifier, callback or return URL, supported storefront language, and verification-related metadata.
 - Each ProofAge API request identifies the plugin through the `X-ProofAge-Sdk` header and a User-Agent carrying the plugin, WordPress, PHP, and (when active) WooCommerce versions.
 - The plugin stores limited verification state locally in WordPress and WooCommerce, including verification status, verification ID, external ID, return URL, timestamps, session token, and optional order verification metadata.
-- Privacy Policy: [https://proofage.xyz/privacy](https://proofage.xyz/privacy)
-- Terms of Service: [https://proofage.xyz/terms](https://proofage.xyz/terms)
+- Privacy Policy: [https://proofage.net/privacy](https://proofage.net/privacy)
+- Terms of Service: [https://proofage.net/terms](https://proofage.net/terms)
 
 ## Installation
 
@@ -107,8 +107,8 @@ The current implementation includes focused Pest tests for:
 
 ## Additional Resources
 
-- **Platform:** https://proofage.xyz
-- **Live Demo:** https://demo.proofage.xyz
+- **Platform:** https://proofage.net
+- **Live Demo:** https://demo.proofage.net
 - **Node SDK:** `@proofage/node` on npm
 
 ### Integrations for other platforms

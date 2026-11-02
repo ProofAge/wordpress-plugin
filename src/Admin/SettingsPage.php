@@ -154,8 +154,8 @@ final class SettingsPage
 
     private function renderServiceDisclosure(): void
     {
-        $privacyPolicyUrl = 'https://proofage.xyz/privacy';
-        $termsOfServiceUrl = 'https://proofage.xyz/terms';
+        $privacyPolicyUrl = 'https://proofage.net/privacy';
+        $termsOfServiceUrl = 'https://proofage.net/terms';
 
         echo '<div class="card" style="max-width: 960px; margin: 16px 0; padding: 16px;">';
         echo '<h2>' . esc_html__('External service disclosure', 'proofage-age-verification') . '</h2>';
