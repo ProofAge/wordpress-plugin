@@ -12,7 +12,7 @@ This plugin provides a first-class WordPress and WooCommerce integration: an adm
 
 ## What It Does
 
-- Adds a dedicated admin settings page for ProofAge credentials and gate behavior.
+- Adds a dedicated admin settings page with a Connect ProofAge button and the gate behavior.
 - Supports site-wide, category-based, and product-level protection rules.
 - Protects WooCommerce product pages, add-to-cart flows, cart validation, and checkout validation.
 - Stores a ProofAge verification snapshot on WooCommerce orders and shows it in the admin order details panel.
@@ -27,8 +27,8 @@ This plugin provides a first-class WordPress and WooCommerce integration: an adm
 
 ## External Service Disclosure
 
-- This plugin requires a ProofAge account and valid API credentials.
-- It connects to the ProofAge API to create verifications, fetch verification status, and process signed webhook callbacks.
+- This plugin requires a ProofAge account. It connects to your workspace with a key made for this site when you click Connect ProofAge.
+- It uses two hosts. `app.proofage.net` is used only while connecting: the plugin sends it its public client ID, a one-time device code and a one-time token, and receives the workspace keys. `api.proofage.net` is the ProofAge API: it creates verifications, fetches verification status and sets up the webhook subscription through which ProofAge sends results to the site.
 - When a shopper starts verification, the plugin sends limited verification request data to ProofAge, such as an external identifier, callback or return URL, supported storefront language, and verification-related metadata.
 - Each ProofAge API request identifies the plugin through the `X-ProofAge-Sdk` header and a User-Agent carrying the plugin, WordPress, PHP, and (when active) WooCommerce versions.
 - The plugin stores limited verification state locally in WordPress and WooCommerce, including verification status, verification ID, external ID, return URL, timestamps, session token, and optional order verification metadata.
@@ -40,19 +40,10 @@ This plugin provides a first-class WordPress and WooCommerce integration: an adm
 1. Copy the `proofage-age-verification` directory into `wp-content/plugins/`.
 2. Activate **ProofAge Age Verification** in the WordPress admin.
 3. Open `Settings -> ProofAge Verification`.
-4. Enter your ProofAge API key and secret key.
+4. Click **Connect ProofAge**. The page shows a code: open the ProofAge link, sign in, enter the code, pick a workspace and click **Allow**. The plugin receives a key made for this site and subscribes its own webhook address (`https://your-store.example/wp-json/proofage/v1/webhook`), so nothing is pasted anywhere.
 5. Configure launch mode, gate texts, TTL, and product/category targeting rules.
-6. Set the ProofAge webhook URL to:
 
-```text
-https://your-store.example/wp-json/proofage/v1/webhook
-```
-
-7. Ensure ProofAge can return to this handler URL:
-
-```text
-https://your-store.example/?proofage-return=1
-```
+Until the site is connected, protected pages stay locked and visitors see "Age verification is temporarily unavailable." The webhook address must be a public `https` URL; on a site ProofAge cannot reach, the plugin checks results when the shopper comes back instead.
 
 The plugin appends an `origin` query parameter automatically for each verification attempt so the shopper can be returned to the correct page after the hosted flow finishes.
 

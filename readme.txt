@@ -4,7 +4,7 @@ Tags: age verification, age gate, woocommerce, checkout, ecommerce
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.2
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,16 +26,6 @@ With this plugin you can:
 
 The plugin uses the hosted ProofAge flow and webhooks together with browser-side return reconciliation and status polling.
 
-External service disclosure:
-
-* this plugin requires a ProofAge account and valid API credentials
-* it connects to the ProofAge API to create verifications, fetch verification status, and process signed webhook callbacks
-* when a shopper starts verification, the plugin sends limited verification request data to ProofAge, such as an external identifier, callback or return URL, supported storefront language, and verification-related metadata
-* each ProofAge API request identifies the plugin through an X-ProofAge-Sdk header and a User-Agent carrying the plugin, WordPress, PHP, and (when active) WooCommerce versions
-* the plugin stores limited verification state locally in WordPress and WooCommerce, including verification status, verification ID, external ID, return URL, timestamps, session token, and optional order verification metadata
-* ProofAge Privacy Policy: https://proofage.net/privacy
-* ProofAge Terms of Service: https://proofage.net/terms
-
 Supported browser flows:
 
 * open the hosted verification in an iframe modal on the current page
@@ -47,15 +37,31 @@ This version intentionally does not support:
 * a custom in-page ProofAge capture UI
 * theme-specific quick-view integrations beyond the generic add-to-cart interception hooks
 
+== External services ==
+
+This plugin connects to two ProofAge services. A ProofAge account is required. ProofAge Privacy Policy: https://proofage.net/privacy. ProofAge Terms of Service: https://proofage.net/terms.
+
+= ProofAge connect service (app.proofage.net) =
+
+Used only while you connect the site to a ProofAge workspace, when you click Connect ProofAge on the settings page. The plugin sends the plugin's public client ID, a one-time device code and, once you have approved the connection in ProofAge, a one-time access token. In return it receives the workspace's public key and a secret key made for this site, which it stores in the WordPress database and uses to sign its API requests.
+
+= ProofAge API (api.proofage.net) =
+
+Used to create verifications, fetch verification status and set up the webhook subscription through which ProofAge sends results to this site. When a shopper starts verification, the plugin sends limited verification request data to ProofAge, such as an external identifier, callback or return URL, supported storefront language, and verification-related metadata. To set up the subscription the plugin sends this site's webhook address. Each request identifies the plugin through an X-ProofAge-Sdk header and a User-Agent carrying the plugin, WordPress, PHP, and (when active) WooCommerce versions.
+
+= Data stored locally =
+
+The plugin stores the connection (keys and workspace name) and limited verification state in WordPress and WooCommerce, including verification status, verification ID, external ID, return URL, timestamps, session token, and optional order verification metadata. Uninstalling the plugin removes the connection and deletes this site's webhook subscription in ProofAge.
+
 == Installation ==
 
 1. Upload the proofage-age-verification folder to the /wp-content/plugins/ directory, or install the plugin through WordPress.
 2. Activate ProofAge Age Verification in the WordPress admin.
 3. Go to Settings -> ProofAge Verification.
-4. Enter your ProofAge API key and secret key.
+4. Click Connect ProofAge. The page shows a code: open the ProofAge link, sign in, enter the code, pick a workspace and click Allow.
 5. Configure launch mode, gate texts, verification TTL, and protection scope.
-6. Set the ProofAge webhook URL to https://your-store.example/wp-json/proofage/v1/webhook.
-7. Make sure ProofAge can return to https://your-store.example/?proofage-return=1.
+
+Nothing is copied between ProofAge and WordPress: the plugin receives a key made for this site and subscribes its own webhook address, so ProofAge sends results to your site. Until the site is connected, protected pages stay locked.
 
 The plugin automatically appends an origin query parameter so shoppers can be returned to the page where they started verification.
 
@@ -75,7 +81,7 @@ Yes. The Gate texts can be translated through Polylang or WPML String Translatio
 
 = Does this plugin use an external service? =
 
-Yes. This plugin connects to ProofAge to create verifications, fetch status updates, and process webhook callbacks. A ProofAge account and API credentials are required.
+Yes. This plugin connects to ProofAge to create verifications, fetch status updates, and process webhook callbacks. A ProofAge account is required; you connect it with the Connect ProofAge button. See the External services section for what is sent where.
 
 = What data does the plugin send to ProofAge and store locally? =
 
@@ -94,6 +100,15 @@ Yes. For WooCommerce orders the plugin stores a ProofAge verification snapshot i
 Yes. Hosted verification can open in an iframe modal, in the current window, or in a new tab, depending on the selected launch mode.
 
 == Changelog ==
+
+= 0.3.0 =
+
+* Connect ProofAge: a button on the settings page connects the site to your ProofAge workspace. The API key and secret key fields are gone, and nothing is copied between ProofAge and WordPress.
+* The plugin subscribes its own webhook address in ProofAge, so you no longer paste the webhook URL into the workspace settings.
+* The settings page shows which workspace is connected and whether it is a test or live workspace.
+* If the key is deleted in ProofAge, the settings page says so and protected pages stay locked until you connect again.
+* The webhook endpoint answers 410 to a delivery it cannot verify, so ProofAge removes subscriptions this site no longer holds a key for.
+* Uninstalling the plugin removes its webhook subscription in ProofAge.
 
 = 0.2.2 =
 
@@ -118,6 +133,10 @@ Yes. Hosted verification can open in an iframe modal, in the current window, or 
 * Added storefront language passthrough for supported ProofAge SDK languages.
 
 == Upgrade Notice ==
+
+= 0.3.0 =
+
+The API key and secret key fields are replaced by a Connect ProofAge button. After updating, open Settings -> ProofAge Verification and click Connect ProofAge. Until then protected pages stay locked.
 
 = 0.2.2 =
 
