@@ -3,7 +3,7 @@
 namespace ProofAge\WordPress\Http;
 
 use ProofAge\WordPress\ProofAge\WebhookSignatureVerifier;
-use ProofAge\WordPress\Support\Options;
+use ProofAge\WordPress\Support\Connection;
 use ProofAge\WordPress\Verification\SessionManager;
 
 if (! defined('ABSPATH')) {
@@ -25,13 +25,22 @@ final class WebhookController
         $timestamp = (string) $request->get_header('x-timestamp');
         $signature = (string) $request->get_header('x-hmac-signature');
         $rawBody = $request->get_body();
-        $secretKey = (string) Options::get('secret_key', '');
+        $secretKey = Connection::secretKey();
 
-        if ($secretKey === '' || ! $this->signatureVerifier->isValid($timestamp, $rawBody, $signature, $secretKey)) {
-            return new WP_REST_Response([
-                'ok' => false,
-                'message' => 'Invalid signature.',
-            ], 401);
+        // 410 tells ProofAge to delete the subscription: this site holds no key that can verify
+        // its deliveries (the key was deleted, or the site disconnected and the subscription
+        // survived). A missing or stale timestamp stays 401, so a wrong server clock never
+        // deletes the subscription.
+        if ($secretKey === '') {
+            return $this->rejected(410);
+        }
+
+        if (! $this->signatureVerifier->isFresh($timestamp)) {
+            return $this->rejected(401);
+        }
+
+        if (! $this->signatureVerifier->matches($timestamp, $rawBody, $signature, $secretKey)) {
+            return $this->rejected(410);
         }
 
         $payload = json_decode($rawBody, true);
@@ -75,5 +84,13 @@ final class WebhookController
         return new WP_REST_Response([
             'ok' => true,
         ], 200);
+    }
+
+    private function rejected(int $status): WP_REST_Response
+    {
+        return new WP_REST_Response([
+            'ok' => false,
+            'message' => 'Invalid signature.',
+        ], $status);
     }
 }

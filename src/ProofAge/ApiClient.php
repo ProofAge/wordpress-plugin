@@ -2,7 +2,7 @@
 
 namespace ProofAge\WordPress\ProofAge;
 
-use ProofAge\WordPress\Support\Options;
+use ProofAge\WordPress\Support\Connection;
 use WP_Error;
 
 if (! defined('ABSPATH')) {
@@ -11,8 +11,6 @@ if (! defined('ABSPATH')) {
 
 final class ApiClient
 {
-    private const BASE_URL = 'https://api.proofage.net';
-
     public function createVerification(
         string $externalId,
         string $returnUrl,
@@ -46,8 +44,47 @@ final class ApiClient
         return $this->request('GET', '/v1/consent');
     }
 
+    /**
+     * @return array<int, array<string, mixed>>|WP_Error
+     */
+    public function listWebhookSubscriptions(): array|WP_Error
+    {
+        $response = $this->request('GET', '/v1/webhook-subscriptions');
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $subscriptions = $response['data']['data'] ?? [];
+
+        return is_array($subscriptions) ? array_values(array_filter($subscriptions, 'is_array')) : [];
+    }
+
+    /**
+     * Subscribes a URL to every decision, without document data.
+     */
+    public function createWebhookSubscription(string $url): array|WP_Error
+    {
+        return $this->request('POST', '/v1/webhook-subscriptions', [
+            'url' => $url,
+            'include_document_data' => false,
+        ]);
+    }
+
+    public function deleteWebhookSubscription(string $subscriptionId, int $timeout = 15): array|WP_Error
+    {
+        return $this->request('DELETE', '/v1/webhook-subscriptions/' . rawurlencode($subscriptionId), null, $timeout);
+    }
+
     public function testConnectivity(): array
     {
+        if (! Connection::isConnected()) {
+            return [
+                'success' => false,
+                'message' => __('ProofAge is not connected. Click Connect ProofAge first.', 'proofage-age-verification'),
+            ];
+        }
+
         $response = $this->getConsent();
 
         if (is_wp_error($response)) {
@@ -63,19 +100,66 @@ final class ApiClient
         ];
     }
 
-    private function request(string $method, string $path, ?array $payload = null): array|WP_Error
+    /**
+     * Sends a signed request. A `401` is checked once more with a second call; if that also answers
+     * `401`, the key is gone and the connection is marked lost.
+     */
+    private function request(string $method, string $path, ?array $payload = null, int $timeout = 15): array|WP_Error
     {
-        $apiKey = (string) Options::get('api_key', '');
-        $secretKey = (string) Options::get('secret_key', '');
+        $response = $this->send($method, $path, $payload, $timeout);
 
-        if ($apiKey === '') {
-            return new WP_Error('proofage_missing_api_key', __('ProofAge API key is not configured.', 'proofage-age-verification'));
+        if (! is_wp_error($response)) {
+            Connection::setSuspended(false);
+
+            return $response;
+        }
+
+        $status = $this->errorStatus($response);
+        $errorCode = $this->errorCode($response);
+
+        if ($status === 401) {
+            return $this->handleUnauthorized($response, $timeout);
+        }
+
+        if ($errorCode === 'WORKSPACE_SUSPENDED') {
+            Connection::setSuspended(true);
+
+            return new WP_Error('proofage_workspace_suspended', $this->unavailableMessage(), ['status' => 503]);
+        }
+
+        return $response;
+    }
+
+    /**
+     * The confirming call goes through send(), not request(), so it cannot trigger this check again.
+     */
+    private function handleUnauthorized(WP_Error $original, int $timeout): WP_Error
+    {
+        $confirmation = $this->send('GET', '/v1/consent', null, $timeout);
+
+        if (! is_wp_error($confirmation) || $this->errorStatus($confirmation) !== 401) {
+            return $original;
+        }
+
+        Connection::markLost();
+
+        return new WP_Error('proofage_connection_lost', $this->unavailableMessage(), ['status' => 503]);
+    }
+
+    private function send(string $method, string $path, ?array $payload, int $timeout): array|WP_Error
+    {
+        $apiKey = Connection::apiKey();
+        $secretKey = Connection::secretKey();
+
+        if ($apiKey === '' || $secretKey === '') {
+            return new WP_Error('proofage_not_connected', $this->unavailableMessage(), ['status' => 503]);
         }
 
         $body = $payload === null ? '' : wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $headers = [
             'Accept' => 'application/json',
             'X-API-Key' => $apiKey,
+            'X-HMAC-Signature' => (new RequestSigner($secretKey))->sign($method, $path, $body),
             ClientIdentity::SDK_HEADER => ClientIdentity::sdkHeaderValue(),
         ];
 
@@ -83,13 +167,9 @@ final class ApiClient
             $headers['Content-Type'] = 'application/json';
         }
 
-        if ($secretKey !== '') {
-            $headers['X-HMAC-Signature'] = (new RequestSigner($secretKey))->sign($method, $path, $body);
-        }
-
-        $response = wp_remote_request(self::BASE_URL . $path, [
+        $response = wp_remote_request(Endpoints::apiUrl() . $path, [
             'method' => $method,
-            'timeout' => 15,
+            'timeout' => $timeout,
             'user-agent' => ClientIdentity::userAgent(),
             'headers' => $headers,
             'body' => $body === '' ? null : $body,
@@ -105,7 +185,7 @@ final class ApiClient
 
         if ($statusCode < 200 || $statusCode >= 300) {
             $message = is_array($decoded)
-                ? (string) ($decoded['error']['message'] ?? __('Unknown ProofAge API error.', 'proofage-age-verification'))
+                ? (string) ($decoded['error']['message'] ?? $decoded['message'] ?? __('Unknown ProofAge API error.', 'proofage-age-verification'))
                 : __('Unknown ProofAge API error.', 'proofage-age-verification');
 
             return new WP_Error('proofage_api_error', $message, [
@@ -117,5 +197,28 @@ final class ApiClient
         return [
             'data' => is_array($decoded) ? $decoded : [],
         ];
+    }
+
+    private function errorStatus(WP_Error $error): int
+    {
+        $data = $error->get_error_data();
+
+        return is_array($data) ? (int) ($data['status'] ?? 0) : 0;
+    }
+
+    private function errorCode(WP_Error $error): string
+    {
+        $data = $error->get_error_data();
+        $response = is_array($data) ? ($data['response'] ?? null) : null;
+
+        return is_array($response) && is_array($response['error'] ?? null) ? (string) ($response['error']['code'] ?? '') : '';
+    }
+
+    /**
+     * What a visitor sees when the site is not connected, the key is lost or the workspace is suspended.
+     */
+    private function unavailableMessage(): string
+    {
+        return __('Age verification is temporarily unavailable.', 'proofage-age-verification');
     }
 }

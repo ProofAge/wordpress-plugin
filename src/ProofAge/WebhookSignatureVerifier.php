@@ -19,16 +19,26 @@ final class WebhookSignatureVerifier
         string $secretKey,
         ?int $currentTime = null,
     ): bool {
+        return $this->isFresh($timestamp, $currentTime)
+            && $this->matches($timestamp, $rawBody, $providedSignature, $secretKey);
+    }
+
+    /**
+     * A timestamp that is missing, not a number or outside the replay window.
+     */
+    public function isFresh(string $timestamp, ?int $currentTime = null): bool
+    {
         if (! ctype_digit($timestamp)) {
             return false;
         }
 
         $currentTime ??= time();
 
-        if (abs($currentTime - (int) $timestamp) > $this->replayWindowSeconds) {
-            return false;
-        }
+        return abs($currentTime - (int) $timestamp) <= $this->replayWindowSeconds;
+    }
 
+    public function matches(string $timestamp, string $rawBody, string $providedSignature, string $secretKey): bool
+    {
         $expected = hash_hmac('sha256', "{$timestamp}.{$rawBody}", $secretKey);
 
         return hash_equals($expected, $providedSignature);

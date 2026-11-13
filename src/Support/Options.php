@@ -16,8 +16,6 @@ final class Options
     public static function defaults(): array
     {
         return [
-            'api_key' => '',
-            'secret_key' => '',
             'site_enabled' => false,
             'launch_mode' => 'redirect',
             'content_display_mode' => 'gate',
@@ -57,12 +55,6 @@ final class Options
             $existing = [];
         }
 
-        $secretKey = self::sanitizeSecret($input['secret_key'] ?? '', true);
-
-        if ($secretKey === '') {
-            $secretKey = self::sanitizeSecret($existing['secret_key'] ?? $defaults['secret_key']);
-        }
-
         $protectedCategoryIds = self::sanitizeIdList($input['protected_category_ids'] ?? ($existing['protected_category_ids'] ?? []));
         $protectedProductIds = self::sanitizeIdList($input['protected_product_ids'] ?? ($existing['protected_product_ids'] ?? []));
         $excludedCategoryIds = self::sanitizeIdList($input['excluded_category_ids'] ?? ($existing['excluded_category_ids'] ?? []));
@@ -71,8 +63,6 @@ final class Options
         $protectedPageIds = self::sanitizeIdList($input['protected_page_ids'] ?? ($existing['protected_page_ids'] ?? []));
 
         return [
-            'api_key' => self::sanitizeText($input['api_key'] ?? $defaults['api_key']),
-            'secret_key' => $secretKey,
             'site_enabled' => self::sanitizeBool($input['site_enabled'] ?? $defaults['site_enabled']),
             'launch_mode' => $launchMode,
             'content_display_mode' => self::sanitizeDisplayMode($input['content_display_mode'] ?? $defaults['content_display_mode']),
@@ -224,21 +214,6 @@ final class Options
         }
 
         return trim(wp_strip_all_tags((string) $value));
-    }
-
-    private static function sanitizeSecret(mixed $value, bool $unslash = false): string
-    {
-        if (! is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $secret = (string) $value;
-
-        if ($unslash && function_exists('wp_unslash')) {
-            $secret = wp_unslash($secret);
-        }
-
-        return $secret;
     }
 
     private static function sanitizeTextarea(mixed $value): string
