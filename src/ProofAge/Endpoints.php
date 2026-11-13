@@ -25,6 +25,12 @@ final class Endpoints
     private const CONNECT_CLIENT_ID = 'proofage-for-wordpress-not-registered';
 
     /**
+     * What CONNECT_CLIENT_ID holds until the real ID is put in. Never change it: it is how a build
+     * without a registered ID is recognised.
+     */
+    private const PLACEHOLDER_CLIENT_ID = 'proofage-for-wordpress-not-registered';
+
+    /**
      * Host for /oauth/device/code, /oauth/token and /oauth/connect/credentials.
      */
     public static function appUrl(): string
@@ -47,7 +53,7 @@ final class Endpoints
 
     public static function hasConnectClientId(): bool
     {
-        return self::connectClientId() !== self::CONNECT_CLIENT_ID;
+        return self::connectClientId() !== self::PLACEHOLDER_CLIENT_ID;
     }
 
     private static function constant(string $name, string $default): string
