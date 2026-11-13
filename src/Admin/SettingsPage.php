@@ -13,6 +13,7 @@ final class SettingsPage
     public function __construct(
         private readonly ApiClient $apiClient,
         private readonly ScopeSelectorProvider $scopeSelectorProvider,
+        private readonly ConnectionCard $connectionCard,
     )
     {
     }
@@ -46,8 +47,9 @@ final class SettingsPage
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('ProofAge age verification', 'proofage-age-verification') . '</h1>';
-        echo '<p>' . esc_html__('Configure ProofAge credentials, gate behavior, and targeting rules for WordPress and WooCommerce content.', 'proofage-age-verification') . '</p>';
+        echo '<p>' . esc_html__('Connect your ProofAge workspace and configure gate behavior, and targeting rules for WordPress and WooCommerce content.', 'proofage-age-verification') . '</p>';
 
+        $this->connectionCard->render();
         $this->renderServiceDisclosure();
         $this->renderDiagnostics();
 
@@ -131,7 +133,6 @@ final class SettingsPage
     private function renderDiagnostics(): void
     {
         $returnUrl = add_query_arg('proofage-return', '1', home_url('/'));
-        $webhookUrl = rest_url('proofage/v1/webhook');
         $connectivityUrl = wp_nonce_url(
             add_query_arg(
                 [
@@ -146,7 +147,6 @@ final class SettingsPage
         echo '<div class="card" style="max-width: 960px; margin: 16px 0; padding: 16px;">';
         echo '<h2>' . esc_html__('Diagnostics', 'proofage-age-verification') . '</h2>';
         echo '<p><strong>' . esc_html__('Return URL:', 'proofage-age-verification') . '</strong> <code>' . esc_html($returnUrl) . '</code></p>';
-        echo '<p><strong>' . esc_html__('Webhook URL:', 'proofage-age-verification') . '</strong> <code>' . esc_html($webhookUrl) . '</code></p>';
         echo '<p><strong>' . esc_html__('WooCommerce status:', 'proofage-age-verification') . '</strong> ' . esc_html($this->isWooCommerceAvailable() ? __('Active', 'proofage-age-verification') : __('Inactive', 'proofage-age-verification')) . '</p>';
         echo '<p><a class="button button-secondary" href="' . esc_url($connectivityUrl) . '">' . esc_html__('Run connectivity test', 'proofage-age-verification') . '</a></p>';
         echo '</div>';
@@ -159,8 +159,8 @@ final class SettingsPage
 
         echo '<div class="card" style="max-width: 960px; margin: 16px 0; padding: 16px;">';
         echo '<h2>' . esc_html__('External service disclosure', 'proofage-age-verification') . '</h2>';
-        echo '<p>' . esc_html__('This plugin requires a ProofAge account and valid API credentials.', 'proofage-age-verification') . '</p>';
-        echo '<p>' . esc_html__('It connects to the ProofAge API to create verifications, check verification status, and process signed webhook callbacks.', 'proofage-age-verification') . '</p>';
+        echo '<p>' . esc_html__('This plugin requires a ProofAge account. It connects to your ProofAge workspace with a key made for this site when you click Connect ProofAge.', 'proofage-age-verification') . '</p>';
+        echo '<p>' . esc_html__('It uses two ProofAge hosts. app.proofage.net is used only while connecting: the plugin sends it its public client ID, a one-time device code and a one-time token, and receives the workspace keys. api.proofage.net is the ProofAge API: it creates verifications, checks verification status and sets up the webhook subscription through which ProofAge sends results to this site.', 'proofage-age-verification') . '</p>';
         echo '<p>' . esc_html__('When a shopper starts verification, the plugin sends limited verification request data to ProofAge, such as an external identifier, callback or return URL, supported storefront language, and verification-related metadata.', 'proofage-age-verification') . '</p>';
         echo '<p>' . esc_html__('The plugin stores limited verification state locally in WordPress and WooCommerce, including verification status, verification ID, external ID, return URL, timestamps, session token, and optional order verification metadata.', 'proofage-age-verification') . '</p>';
         printf(

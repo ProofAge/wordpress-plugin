@@ -3,16 +3,20 @@
 namespace ProofAge\WordPress;
 
 use ProofAge\WordPress\Admin\CategoryMeta;
+use ProofAge\WordPress\Admin\ConnectionCard;
 use ProofAge\WordPress\Admin\ProductMeta;
 use ProofAge\WordPress\Admin\SettingsPage;
 use ProofAge\WordPress\Admin\SettingsRegistrar;
 use ProofAge\WordPress\Admin\ScopeSelectorProvider;
+use ProofAge\WordPress\Connect\DeviceFlow;
+use ProofAge\WordPress\Connect\WebhookSubscriber;
 use ProofAge\WordPress\Frontend\Assets;
 use ProofAge\WordPress\Frontend\Gatekeeper;
 use ProofAge\WordPress\Http\RestRoutes;
 use ProofAge\WordPress\Http\ReturnController;
 use ProofAge\WordPress\Http\WebhookController;
 use ProofAge\WordPress\ProofAge\ApiClient;
+use ProofAge\WordPress\ProofAge\ConnectClient;
 use ProofAge\WordPress\ProofAge\WebhookSignatureVerifier;
 use ProofAge\WordPress\Support\LocalizedGateTexts;
 use ProofAge\WordPress\Support\Options;
@@ -41,7 +45,11 @@ final class Plugin
         $scopeSelectorProvider = new ScopeSelectorProvider();
 
         (new SettingsRegistrar($scopeSelectorProvider))->registerHooks();
-        (new SettingsPage($apiClient, $scopeSelectorProvider))->registerHooks();
+        $webhookSubscriber = new WebhookSubscriber($apiClient);
+        $connectionCard = new ConnectionCard(new DeviceFlow(new ConnectClient(), $webhookSubscriber), $webhookSubscriber);
+
+        $connectionCard->registerHooks();
+        (new SettingsPage($apiClient, $scopeSelectorProvider, $connectionCard))->registerHooks();
         $localizedGateTexts->registerHooks();
         (new Assets($sessionManager))->registerHooks();
         (new Gatekeeper($rulesEngine, $sessionManager))->registerHooks();

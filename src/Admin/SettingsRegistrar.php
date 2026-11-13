@@ -35,13 +35,6 @@ final class SettingsRegistrar
         );
 
         add_settings_section(
-            'proofage_api',
-            __('ProofAge API', 'proofage-age-verification'),
-            '__return_empty_string',
-            self::PAGE_SLUG
-        );
-
-        add_settings_section(
             'proofage_behavior',
             __('Verification behavior', 'proofage-age-verification'),
             '__return_empty_string',
@@ -130,16 +123,6 @@ final class SettingsRegistrar
 
             default:
                 $inputValue = is_array($value) ? implode(', ', $value) : (string) $value;
-                $extraDescription = '';
-
-                if ($field['type'] === 'password' && $inputValue !== '') {
-                    $extraDescription = ' ' . sprintf(
-                        /* translators: %s is a masked secret key preview. */
-                        __('Current value: %s', 'proofage-age-verification'),
-                        esc_html($this->maskValue($inputValue))
-                    );
-                    $inputValue = '';
-                }
 
                 printf(
                     '<input class="regular-text" type="%4$s" name="%1$s[%2$s]" id="%2$s" value="%3$s" />',
@@ -148,10 +131,6 @@ final class SettingsRegistrar
                     esc_attr($inputValue),
                     esc_attr($field['type'])
                 );
-
-                if ($extraDescription !== '') {
-                    $description .= $extraDescription;
-                }
                 break;
         }
 
@@ -173,35 +152,12 @@ final class SettingsRegistrar
         printf('<p class="description">%s</p>', esc_html($hint));
     }
 
-    private function maskValue(string $value): string
-    {
-        if (strlen($value) <= 8) {
-            return str_repeat('*', strlen($value));
-        }
-
-        return substr($value, 0, 4) . str_repeat('*', strlen($value) - 8) . substr($value, -4);
-    }
-
     /**
      * @return array<int, array<string, mixed>>
      */
     private function fieldDefinitions(): array
     {
         return [
-            [
-                'key' => 'api_key',
-                'label' => __('API key', 'proofage-age-verification'),
-                'section' => 'proofage_api',
-                'type' => 'text',
-                'description' => __('Public ProofAge workspace key.', 'proofage-age-verification'),
-            ],
-            [
-                'key' => 'secret_key',
-                'label' => __('Secret key', 'proofage-age-verification'),
-                'section' => 'proofage_api',
-                'type' => 'password',
-                'description' => __('Secret key used for HMAC signing. Stored in WordPress options.', 'proofage-age-verification'),
-            ],
             [
                 'key' => 'site_enabled',
                 'label' => __('Enable site-wide protection', 'proofage-age-verification'),
