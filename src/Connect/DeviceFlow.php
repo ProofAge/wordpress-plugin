@@ -120,6 +120,8 @@ final class DeviceFlow
             return $this->pendingFor($userId);
         }
 
+        $result = null;
+
         try {
             // A poll from another tab may have finished while this one waited for the lock.
             if (Connection::isConnected()) {
@@ -136,10 +138,19 @@ final class DeviceFlow
                 return $this->pending($flow);
             }
 
-            return $this->exchange($userId, $flow);
+            $result = $this->exchange($userId, $flow);
         } finally {
             $this->releaseLock($userId);
         }
+
+        // The keys are stored, so the next poll answers "connected" even while this one is busy
+        // with the subscription, which can take a while. Do not hold the lock for it.
+        if (($result['subscribe'] ?? false) === true) {
+            $this->subscriber->ensure();
+            unset($result['subscribe']);
+        }
+
+        return $result;
     }
 
     public function cancel(int $userId): void
@@ -177,6 +188,11 @@ final class DeviceFlow
             case 'expired_token':
             case 'invalid_grant':
                 $this->cancel($userId);
+
+                // Another request may have used the code and stored the keys just before this one.
+                if (Connection::isConnected()) {
+                    return ['status' => 'connected'];
+                }
 
                 return $this->expired();
 
@@ -224,9 +240,8 @@ final class DeviceFlow
                 && is_string($body['secret_key'] ?? null) && $body['secret_key'] !== ''
             ) {
                 Connection::store($body['api_key'], $body['secret_key'], $workspace);
-                $this->subscriber->ensure();
 
-                return ['status' => 'connected'];
+                return ['status' => 'connected', 'subscribe' => true];
             }
         }
 
@@ -365,9 +380,11 @@ final class DeviceFlow
     }
 
     /**
-     * add_option() fails when the option exists, which makes the lock atomic on every host. A
-     * transient would not be on a site without an object cache. A lock older than the limit is
-     * a crashed request and is taken over.
+     * add_option() fails when the option exists, which makes the lock reliable on a normal
+     * database but not strictly atomic: a second request can slip in when the option is written
+     * at the very same moment. The callers cope with that: a poll that loses the race to the
+     * token request gets invalid_grant and checks for a stored connection first. A lock older
+     * than the limit is a crashed request and is taken over.
      */
     private function acquireLock(int $userId): bool
     {
