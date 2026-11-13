@@ -47,7 +47,7 @@ final class SettingsPage
 
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('ProofAge age verification', 'proofage-age-verification') . '</h1>';
-        echo '<p>' . esc_html__('Connect your ProofAge workspace and configure gate behavior, and targeting rules for WordPress and WooCommerce content.', 'proofage-age-verification') . '</p>';
+        echo '<p>' . esc_html__('Connect your ProofAge workspace, then configure gate behavior and targeting rules for WordPress and WooCommerce content.', 'proofage-age-verification') . '</p>';
 
         $this->connectionCard->render();
         $this->renderServiceDisclosure();
