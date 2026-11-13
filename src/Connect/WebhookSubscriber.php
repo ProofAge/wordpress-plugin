@@ -100,8 +100,12 @@ final class WebhookSubscriber
         return $this->apiClient->deleteWebhookSubscription($id);
     }
 
+    /**
+     * The stored subscription may have been deleted on the way here, so none is kept.
+     */
     private function fail(string $error): bool
     {
+        Connection::clearSubscription();
         Connection::setWebhookError($error);
 
         return false;
