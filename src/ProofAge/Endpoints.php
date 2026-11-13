@@ -19,10 +19,10 @@ final class Endpoints
     private const API_URL = 'https://api.proofage.net';
 
     /**
-     * The public client ID of the connect app "ProofAge for WordPress". It is replaced by the
-     * production value before release.
+     * The public client ID of the connect app "ProofAge for WordPress" on production. It is public
+     * by design: the device flow has no client secret.
      */
-    private const CONNECT_CLIENT_ID = 'proofage-for-wordpress-not-registered';
+    private const CONNECT_CLIENT_ID = '01a1d5fb-8571-72a0-bea4-f1b24d102064';
 
     /**
      * What CONNECT_CLIENT_ID holds until the real ID is put in. Never change it: it is how a build
