@@ -135,13 +135,16 @@ final class ApiClient
      */
     private function handleUnauthorized(WP_Error $original, int $timeout): WP_Error
     {
+        $refusedSecretKey = Connection::secretKey();
         $confirmation = $this->send('GET', '/v1/consent', null, $timeout);
 
         if (! is_wp_error($confirmation) || $this->errorStatus($confirmation) !== 401) {
             return $original;
         }
 
-        Connection::markLost();
+        if ($refusedSecretKey !== '') {
+            Connection::markLost($refusedSecretKey);
+        }
 
         return new WP_Error('proofage_connection_lost', $this->unavailableMessage(), ['status' => 503]);
     }

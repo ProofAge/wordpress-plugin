@@ -119,6 +119,9 @@ final class ConnectionCard
         echo '<div class="card proofage-connection" style="max-width: 960px; margin: 16px 0; padding: 16px;" data-proofage-connect>';
         echo '<h2>' . esc_html__('Connection', 'proofage-age-verification') . '</h2>';
 
+        // A key ProofAge refused is wiped here, on the admin screen, not in the visitor request that found out.
+        Connection::wipeLostKeys();
+
         $this->renderFlash();
 
         if (Connection::isConnected()) {
@@ -217,7 +220,7 @@ final class ConnectionCard
         $subscriptionId = (string) $connection['subscription_id'];
         $addressChanged = $subscriptionId !== '' && $connection['subscription_url'] !== WebhookSubscriber::webhookUrl();
 
-        if ($subscriptionId !== '' && ! $addressChanged) {
+        if ($subscriptionId !== '' && ! $addressChanged && $connection['webhook_error'] === '') {
             echo '<p>' . esc_html__('Results: ProofAge sends each decision to this site.', 'proofage-age-verification') . '</p>';
 
             return;
