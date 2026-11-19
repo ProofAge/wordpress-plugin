@@ -17,11 +17,18 @@ final class ApiClient
     private $clock;
 
     /**
-     * @param  (callable(): int)|null  $clock  Unix time in seconds; tests inject a fixed one.
+     * @var (callable(int): void)|null
      */
-    public function __construct(?callable $clock = null)
+    private $sleep;
+
+    /**
+     * @param  (callable(): int)|null  $clock  Unix time in seconds; tests inject a fixed one.
+     * @param  (callable(int): void)|null  $sleep  Waits the given number of seconds; tests inject a no-op.
+     */
+    public function __construct(?callable $clock = null, ?callable $sleep = null)
     {
         $this->clock = $clock;
+        $this->sleep = $sleep;
     }
 
     /**
@@ -169,12 +176,49 @@ final class ApiClient
     }
 
     /**
+     * The signature covers whole seconds, so two identical requests signed in the same second share
+     * one, and the server refuses the second with 401 `REPLAYED_REQUEST` before processing it. For a
+     * non-GET request that is safe to send again: wait for the next second and resend once, re-signed,
+     * with the same Idempotency-Key. Any other 401 is left to request().
+     *
+     * @param  array<string, string>  $extraHeaders
+     */
+    private function send(string $method, string $path, ?array $payload, int $timeout, array $extraHeaders = []): array|WP_Error
+    {
+        $response = $this->sendOnce($method, $path, $payload, $timeout, $extraHeaders);
+
+        if (
+            is_wp_error($response)
+            && strtoupper($method) !== 'GET'
+            && $this->errorStatus($response) === 401
+            && $this->errorCode($response) === 'REPLAYED_REQUEST'
+        ) {
+            $this->sleepOneSecond();
+
+            return $this->sendOnce($method, $path, $payload, $timeout, $extraHeaders);
+        }
+
+        return $response;
+    }
+
+    private function sleepOneSecond(): void
+    {
+        if ($this->sleep !== null) {
+            ($this->sleep)(1);
+
+            return;
+        }
+
+        sleep(1);
+    }
+
+    /**
      * Every call builds its own `X-Timestamp` and signature: the server accepts a signed request
      * once, so headers are never reused.
      *
      * @param  array<string, string>  $extraHeaders
      */
-    private function send(string $method, string $path, ?array $payload, int $timeout, array $extraHeaders = []): array|WP_Error
+    private function sendOnce(string $method, string $path, ?array $payload, int $timeout, array $extraHeaders = []): array|WP_Error
     {
         $apiKey = Connection::apiKey();
         $secretKey = Connection::secretKey();

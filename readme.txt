@@ -105,6 +105,7 @@ Yes. Hosted verification can open in an iframe modal, in the current window, or 
 
 * Every request to ProofAge now carries a timestamp that is part of its signature, so a captured request cannot be replayed later.
 * Creating a verification or the webhook subscription now carries an idempotency key, so a repeated request cannot create a duplicate.
+* If ProofAge refuses a create request because an identical one was signed in the same second, the plugin waits a second and sends it again once.
 
 = 0.3.0 =
 

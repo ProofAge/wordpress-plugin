@@ -114,4 +114,62 @@ final class ApiClientTest extends TestCase
             $this->headersOf(1)['X-HMAC-Signature']
         );
     }
+
+    public function testAReplayedCreateIsResentOnceWithANewSignatureAndTheSameKey(): void
+    {
+        WpStub::$responses = [
+            ['response' => ['code' => 401], 'body' => '{"error":{"code":"REPLAYED_REQUEST","message":"replayed"}}'],
+            ['response' => ['code' => 201], 'body' => '{"id":"v1"}'],
+        ];
+        $time = 700;
+        $slept = [];
+        $client = new ApiClient(
+            static function () use (&$time): int {
+                return $time++;
+            },
+            static function (int $seconds) use (&$slept): void {
+                $slept[] = $seconds;
+            }
+        );
+
+        $response = $client->createVerification('order-1', 'https://shop.test/return');
+
+        $this->assertFalse(is_wp_error($response));
+        $this->assertCount(2, WpStub::$requests);
+        $this->assertSame([1], $slept);
+        $this->assertNotSame($this->headersOf(0)['X-Timestamp'], $this->headersOf(1)['X-Timestamp']);
+        $this->assertNotSame($this->headersOf(0)['X-HMAC-Signature'], $this->headersOf(1)['X-HMAC-Signature']);
+        $this->assertSame($this->headersOf(0)['Idempotency-Key'], $this->headersOf(1)['Idempotency-Key']);
+    }
+
+    public function testASecondReplayedAnswerSurfacesAsAnError(): void
+    {
+        $replayed = ['response' => ['code' => 401], 'body' => '{"error":{"code":"REPLAYED_REQUEST","message":"replayed"}}'];
+        WpStub::$responses = [$replayed, $replayed];
+        $client = new ApiClient(static fn (): int => 900, static function (int $seconds): void {
+        });
+
+        $response = $client->createVerification('order-1', 'https://shop.test/return');
+
+        $this->assertTrue(is_wp_error($response));
+        $this->assertSame('proofage_api_error', $response->get_error_code());
+        // Two sends of the create, then the existing 401 confirmation (a GET) which answers 200.
+        $this->assertSame('POST', WpStub::$requests[0]['args']['method']);
+        $this->assertSame('POST', WpStub::$requests[1]['args']['method']);
+        $this->assertCount(3, WpStub::$requests);
+    }
+
+    public function testAReplayedGetIsNotResent(): void
+    {
+        WpStub::$responses = [['response' => ['code' => 401], 'body' => '{"error":{"code":"REPLAYED_REQUEST","message":"replayed"}}']];
+        $slept = 0;
+        $client = new ApiClient(static fn (): int => 900, static function (int $seconds) use (&$slept): void {
+            $slept++;
+        });
+
+        $client->getVerification('abc');
+
+        $this->assertSame(0, $slept);
+        $this->assertSame('/v1/consent', substr(WpStub::$requests[1]['url'], -11));
+    }
 }
