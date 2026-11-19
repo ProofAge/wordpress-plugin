@@ -11,6 +11,8 @@ if (! defined('ABSPATH')) {
 
 final class ApiClient
 {
+    private const CLOCK_OFFSET_OPTION = 'proofage_age_verification_clock_offset';
+
     /**
      * @var (callable(): int)|null
      */
@@ -57,7 +59,13 @@ final class ApiClient
             $payload['metadata'] = $metadata;
         }
 
-        return $this->request('POST', '/v1/verifications', $payload, 15, $this->idempotencyHeaders($idempotencyKey));
+        $idempotencyHeaders = $this->idempotencyHeaders($idempotencyKey);
+
+        if (is_wp_error($idempotencyHeaders)) {
+            return $idempotencyHeaders;
+        }
+
+        return $this->request('POST', '/v1/verifications', $payload, 15, $idempotencyHeaders);
     }
 
     public function getVerification(string $verificationId): array|WP_Error
@@ -91,10 +99,16 @@ final class ApiClient
      */
     public function createWebhookSubscription(string $url, ?string $idempotencyKey = null): array|WP_Error
     {
+        $idempotencyHeaders = $this->idempotencyHeaders($idempotencyKey);
+
+        if (is_wp_error($idempotencyHeaders)) {
+            return $idempotencyHeaders;
+        }
+
         return $this->request('POST', '/v1/webhook-subscriptions', [
             'url' => $url,
             'include_document_data' => false,
-        ], 15, $this->idempotencyHeaders($idempotencyKey));
+        ], 15, $idempotencyHeaders);
     }
 
     public function deleteWebhookSubscription(string $subscriptionId, int $timeout = 15): array|WP_Error
@@ -143,7 +157,7 @@ final class ApiClient
         $status = $this->errorStatus($response);
         $errorCode = $this->errorCode($response);
 
-        if ($status === 401) {
+        if ($status === 401 && ! $this->isNotAKeyProblem($errorCode)) {
             return $this->handleUnauthorized($response, $timeout);
         }
 
@@ -164,7 +178,11 @@ final class ApiClient
         $refusedSecretKey = Connection::secretKey();
         $confirmation = $this->send('GET', '/v1/consent', null, $timeout);
 
-        if (! is_wp_error($confirmation) || $this->errorStatus($confirmation) !== 401) {
+        if (
+            ! is_wp_error($confirmation)
+            || $this->errorStatus($confirmation) !== 401
+            || $this->isNotAKeyProblem($this->errorCode($confirmation))
+        ) {
             return $original;
         }
 
@@ -189,6 +207,15 @@ final class ApiClient
 
         if (
             is_wp_error($response)
+            && $this->errorStatus($response) === 401
+            && $this->errorCode($response) === 'TIMESTAMP_OUT_OF_RANGE'
+            && $this->rememberServerOffset($response)
+        ) {
+            $response = $this->sendOnce($method, $path, $payload, $timeout, $extraHeaders);
+        }
+
+        if (
+            is_wp_error($response)
             && strtoupper($method) !== 'GET'
             && $this->errorStatus($response) === 401
             && $this->errorCode($response) === 'REPLAYED_REQUEST'
@@ -199,6 +226,57 @@ final class ApiClient
         }
 
         return $response;
+    }
+
+    /**
+     * A 401 about the timestamp or a replay says nothing about the keys, so it must never mark the
+     * connection lost.
+     */
+    private function isNotAKeyProblem(string $errorCode): bool
+    {
+        return in_array($errorCode, ['TIMESTAMP_OUT_OF_RANGE', 'TIMESTAMP_REQUIRED', 'REPLAYED_REQUEST'], true);
+    }
+
+    /**
+     * Learns how far this site's clock is from the server's, from the `Date` header of the refusal.
+     * The offset is kept for a day and applied to every later timestamp.
+     *
+     * @return bool  Whether an offset was stored, so the request is worth sending again.
+     */
+    private function rememberServerOffset(WP_Error $error): bool
+    {
+        $data = $error->get_error_data();
+        $serverTime = is_array($data) && is_string($data['date'] ?? null) ? strtotime($data['date']) : false;
+
+        if ($serverTime === false) {
+            return false;
+        }
+
+        $now = $this->localTime();
+
+        update_option(self::CLOCK_OFFSET_OPTION, [
+            'offset' => $serverTime - $now,
+            'expires' => $now + DAY_IN_SECONDS,
+        ], false);
+
+        return true;
+    }
+
+    private function localTime(): int
+    {
+        return (int) ($this->clock !== null ? ($this->clock)() : time());
+    }
+
+    private function requestTime(): int
+    {
+        $now = $this->localTime();
+        $stored = get_option(self::CLOCK_OFFSET_OPTION, []);
+
+        if (! is_array($stored) || (int) ($stored['expires'] ?? 0) <= $now) {
+            return $now;
+        }
+
+        return $now + (int) ($stored['offset'] ?? 0);
     }
 
     private function sleepOneSecond(): void
@@ -228,7 +306,7 @@ final class ApiClient
         }
 
         $body = $payload === null ? '' : wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $timestamp = (string) ($this->clock !== null ? ($this->clock)() : time());
+        $timestamp = (string) $this->requestTime();
         $headers = [
             'Accept' => 'application/json',
             'X-API-Key' => $apiKey,
@@ -265,6 +343,7 @@ final class ApiClient
             return new WP_Error('proofage_api_error', $message, [
                 'status' => $statusCode,
                 'response' => $decoded,
+                'date' => (string) wp_remote_retrieve_header($response, 'date'),
             ]);
         }
 
@@ -274,13 +353,25 @@ final class ApiClient
     }
 
     /**
-     * @return array<string, string>
+     * A caller's key must be 1 to 255 printable ASCII characters; without one a UUID is made.
+     *
+     * @return array<string, string>|WP_Error
      */
-    private function idempotencyHeaders(?string $idempotencyKey): array
+    private function idempotencyHeaders(?string $idempotencyKey): array|WP_Error
     {
-        $key = $idempotencyKey !== null && $idempotencyKey !== '' ? $idempotencyKey : wp_generate_uuid4();
+        if ($idempotencyKey === null) {
+            return ['Idempotency-Key' => wp_generate_uuid4()];
+        }
 
-        return ['Idempotency-Key' => $key];
+        if (preg_match('/\A[\x21-\x7E]{1,255}\z/', $idempotencyKey) !== 1) {
+            return new WP_Error(
+                'proofage_invalid_idempotency_key',
+                __('The idempotency key must be 1 to 255 printable ASCII characters.', 'proofage-age-verification'),
+                ['status' => 400]
+            );
+        }
+
+        return ['Idempotency-Key' => $idempotencyKey];
     }
 
     private function errorStatus(WP_Error $error): int

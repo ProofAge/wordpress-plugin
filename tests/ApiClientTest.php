@@ -153,10 +153,11 @@ final class ApiClientTest extends TestCase
 
         $this->assertTrue(is_wp_error($response));
         $this->assertSame('proofage_api_error', $response->get_error_code());
-        // Two sends of the create, then the existing 401 confirmation (a GET) which answers 200.
+        // Two sends of the create and nothing else: a replay is not a key problem.
         $this->assertSame('POST', WpStub::$requests[0]['args']['method']);
         $this->assertSame('POST', WpStub::$requests[1]['args']['method']);
-        $this->assertCount(3, WpStub::$requests);
+        $this->assertCount(2, WpStub::$requests);
+        $this->assertFalse(Connection::isLost());
     }
 
     public function testAReplayedGetIsNotResent(): void
@@ -170,6 +171,91 @@ final class ApiClientTest extends TestCase
         $client->getVerification('abc');
 
         $this->assertSame(0, $slept);
-        $this->assertSame('/v1/consent', substr(WpStub::$requests[1]['url'], -11));
+        $this->assertCount(1, WpStub::$requests);
+    }
+
+    public function testTimestampErrorNeverMarksTheConnectionLost(): void
+    {
+        $outOfRange = ['response' => ['code' => 401], 'body' => '{"error":{"code":"TIMESTAMP_OUT_OF_RANGE","message":"skew"}}'];
+        WpStub::$responses = [$outOfRange, $outOfRange, $outOfRange];
+
+        $response = $this->client()->getVerification('abc');
+
+        $this->assertTrue(is_wp_error($response));
+        $this->assertSame('proofage_api_error', $response->get_error_code());
+        $this->assertTrue(Connection::apiKey() !== '' && ! Connection::isLost());
+        // No Date header: no resend, and no confirming /v1/consent call.
+        $this->assertCount(1, WpStub::$requests);
+    }
+
+    public function testConfirmationAnsweringATimestampErrorDoesNotMarkTheConnectionLost(): void
+    {
+        WpStub::$responses = [
+            ['response' => ['code' => 401], 'body' => '{"error":{"code":"INVALID_SIGNATURE","message":"no"}}'],
+            ['response' => ['code' => 401], 'body' => '{"error":{"code":"TIMESTAMP_OUT_OF_RANGE","message":"skew"}}'],
+        ];
+
+        $this->client()->getVerification('abc');
+
+        $this->assertFalse(Connection::isLost());
+        $this->assertSame('pk_test_key', Connection::apiKey());
+    }
+
+    public function testClockSkewIsLearnedFromTheDateHeaderAndTheRequestResentOnce(): void
+    {
+        $serverTime = 1795049078 + 600;
+        WpStub::$responses = [
+            [
+                'response' => ['code' => 401],
+                'headers' => ['date' => gmdate('D, d M Y H:i:s', $serverTime) . ' GMT'],
+                'body' => '{"error":{"code":"TIMESTAMP_OUT_OF_RANGE","message":"skew"}}',
+            ],
+            ['response' => ['code' => 200], 'body' => '{}'],
+        ];
+        $client = $this->client();
+
+        $response = $client->getVerification('abc');
+
+        $this->assertFalse(is_wp_error($response));
+        $this->assertCount(2, WpStub::$requests);
+        $this->assertSame('1795049078', $this->headersOf(0)['X-Timestamp']);
+        $this->assertSame((string) $serverTime, $this->headersOf(1)['X-Timestamp']);
+        $this->assertSame(
+            (new RequestSigner(self::SECRET))->signTimestamped((string) $serverTime, 'GET', '/v1/verifications/abc'),
+            $this->headersOf(1)['X-HMAC-Signature']
+        );
+
+        $client->getConsent();
+        $this->assertSame((string) $serverTime, $this->headersOf(2)['X-Timestamp']);
+    }
+
+    public function testASecondTimestampErrorIsNotResentAgain(): void
+    {
+        $skewed = [
+            'response' => ['code' => 401],
+            'headers' => ['date' => gmdate('D, d M Y H:i:s', 1795049078 + 600) . ' GMT'],
+            'body' => '{"error":{"code":"TIMESTAMP_OUT_OF_RANGE","message":"skew"}}',
+        ];
+        WpStub::$responses = [$skewed, $skewed];
+
+        $response = $this->client()->getVerification('abc');
+
+        $this->assertTrue(is_wp_error($response));
+        $this->assertCount(2, WpStub::$requests);
+        $this->assertFalse(Connection::isLost());
+    }
+
+    public function testACallerKeyOutsidePrintableAsciiIsRefusedBeforeSending(): void
+    {
+        foreach (['', "has space", "caf\u{e9}", str_repeat('a', 256)] as $key) {
+            $response = $this->client()->createVerification('order-1', 'https://shop.test/return', [], [], $key);
+
+            $this->assertTrue(is_wp_error($response));
+            $this->assertSame('proofage_invalid_idempotency_key', $response->get_error_code());
+        }
+
+        $this->assertCount(0, WpStub::$requests);
+        $this->client()->createVerification('order-1', 'https://shop.test/return', [], [], str_repeat('a', 255));
+        $this->assertCount(1, WpStub::$requests);
     }
 }

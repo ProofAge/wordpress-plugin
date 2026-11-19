@@ -132,3 +132,13 @@ function wp_generate_uuid4(): string
 {
     return sprintf('00000000-0000-4000-8000-%012d', ++WpStub::$uuidCounter);
 }
+
+define('DAY_IN_SECONDS', 86400);
+
+/**
+ * @param  array<string, mixed>  $response
+ */
+function wp_remote_retrieve_header(array $response, string $header): string
+{
+    return (string) ($response['headers'][strtolower($header)] ?? '');
+}

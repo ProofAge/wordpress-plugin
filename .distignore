@@ -12,3 +12,4 @@ tests
 vendor
 node_modules
 README.md
+bin
