@@ -11,7 +11,7 @@ if (! defined('ABSPATH')) {
 
 final class ApiClient
 {
-    private const CLOCK_OFFSET_OPTION = 'proofage_age_verification_clock_offset';
+    public const CLOCK_OFFSET_OPTION = 'proofage_age_verification_clock_offset';
 
     /**
      * @var (callable(): int)|null
