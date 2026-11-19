@@ -4,7 +4,7 @@ Tags: age verification, age gate, woocommerce, checkout, ecommerce
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -101,6 +101,11 @@ Yes. Hosted verification can open in an iframe modal, in the current window, or 
 
 == Changelog ==
 
+= 0.4.0 =
+
+* Every request to ProofAge now carries a timestamp that is part of its signature, so a captured request cannot be replayed later.
+* Creating a verification or the webhook subscription now carries an idempotency key, so a repeated request cannot create a duplicate.
+
 = 0.3.0 =
 
 * Connect ProofAge: a button on the settings page connects the site to your ProofAge workspace. The API key and secret key fields are gone, and nothing is copied between ProofAge and WordPress.
@@ -133,6 +138,10 @@ Yes. Hosted verification can open in an iframe modal, in the current window, or 
 * Added storefront language passthrough for supported ProofAge SDK languages.
 
 == Upgrade Notice ==
+
+= 0.4.0 =
+
+Requests to ProofAge are now signed with a timestamp and creating a verification is idempotent. No action is needed; the site stays connected.
 
 = 0.3.0 =
 

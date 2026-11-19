@@ -5,7 +5,7 @@ namespace ProofAge\WordPress\ProofAge;
 /**
  * Identifies this plugin to the ProofAge API.
  *
- * Neither value is part of the HMAC signature, which covers only the method, path and body.
+ * Neither value is part of the HMAC signature, which covers the timestamp, method, path and body.
  */
 final class ClientIdentity
 {

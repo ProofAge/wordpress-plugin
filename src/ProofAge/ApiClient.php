@@ -11,11 +11,30 @@ if (! defined('ABSPATH')) {
 
 final class ApiClient
 {
+    /**
+     * @var (callable(): int)|null
+     */
+    private $clock;
+
+    /**
+     * @param  (callable(): int)|null  $clock  Unix time in seconds; tests inject a fixed one.
+     */
+    public function __construct(?callable $clock = null)
+    {
+        $this->clock = $clock;
+    }
+
+    /**
+     * Creates a verification. The call carries an `Idempotency-Key` (a fresh UUID unless the caller
+     * passes one), so a repeat of the same request returns the first response instead of a second
+     * verification.
+     */
     public function createVerification(
         string $externalId,
         string $returnUrl,
         array $externalMetadata = [],
-        array $metadata = []
+        array $metadata = [],
+        ?string $idempotencyKey = null
     ): array|WP_Error
     {
         $payload = [
@@ -31,7 +50,7 @@ final class ApiClient
             $payload['metadata'] = $metadata;
         }
 
-        return $this->request('POST', '/v1/verifications', $payload);
+        return $this->request('POST', '/v1/verifications', $payload, 15, $this->idempotencyHeaders($idempotencyKey));
     }
 
     public function getVerification(string $verificationId): array|WP_Error
@@ -63,12 +82,12 @@ final class ApiClient
     /**
      * Subscribes a URL to every decision, without document data.
      */
-    public function createWebhookSubscription(string $url): array|WP_Error
+    public function createWebhookSubscription(string $url, ?string $idempotencyKey = null): array|WP_Error
     {
         return $this->request('POST', '/v1/webhook-subscriptions', [
             'url' => $url,
             'include_document_data' => false,
-        ]);
+        ], 15, $this->idempotencyHeaders($idempotencyKey));
     }
 
     public function deleteWebhookSubscription(string $subscriptionId, int $timeout = 15): array|WP_Error
@@ -104,9 +123,9 @@ final class ApiClient
      * Sends a signed request. A `401` is checked once more with a second call; if that also answers
      * `401`, the key is gone and the connection is marked lost.
      */
-    private function request(string $method, string $path, ?array $payload = null, int $timeout = 15): array|WP_Error
+    private function request(string $method, string $path, ?array $payload = null, int $timeout = 15, array $extraHeaders = []): array|WP_Error
     {
-        $response = $this->send($method, $path, $payload, $timeout);
+        $response = $this->send($method, $path, $payload, $timeout, $extraHeaders);
 
         if (! is_wp_error($response)) {
             Connection::setSuspended(false);
@@ -149,7 +168,13 @@ final class ApiClient
         return new WP_Error('proofage_connection_lost', $this->unavailableMessage(), ['status' => 503]);
     }
 
-    private function send(string $method, string $path, ?array $payload, int $timeout): array|WP_Error
+    /**
+     * Every call builds its own `X-Timestamp` and signature: the server accepts a signed request
+     * once, so headers are never reused.
+     *
+     * @param  array<string, string>  $extraHeaders
+     */
+    private function send(string $method, string $path, ?array $payload, int $timeout, array $extraHeaders = []): array|WP_Error
     {
         $apiKey = Connection::apiKey();
         $secretKey = Connection::secretKey();
@@ -159,12 +184,14 @@ final class ApiClient
         }
 
         $body = $payload === null ? '' : wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $timestamp = (string) ($this->clock !== null ? ($this->clock)() : time());
         $headers = [
             'Accept' => 'application/json',
             'X-API-Key' => $apiKey,
-            'X-HMAC-Signature' => (new RequestSigner($secretKey))->sign($method, $path, $body),
+            'X-Timestamp' => $timestamp,
+            'X-HMAC-Signature' => (new RequestSigner($secretKey))->signTimestamped($timestamp, $method, $path, $body),
             ClientIdentity::SDK_HEADER => ClientIdentity::sdkHeaderValue(),
-        ];
+        ] + $extraHeaders;
 
         if ($body !== '') {
             $headers['Content-Type'] = 'application/json';
@@ -200,6 +227,16 @@ final class ApiClient
         return [
             'data' => is_array($decoded) ? $decoded : [],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function idempotencyHeaders(?string $idempotencyKey): array
+    {
+        $key = $idempotencyKey !== null && $idempotencyKey !== '' ? $idempotencyKey : wp_generate_uuid4();
+
+        return ['Idempotency-Key' => $key];
     }
 
     private function errorStatus(WP_Error $error): int

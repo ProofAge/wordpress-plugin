@@ -20,19 +20,48 @@ final class RequestSigner
     }
 
     /**
+     * Signs a request that also sends `X-Timestamp`: the canonical string is the timestamp, a dot
+     * and the legacy canonical string. Send the same timestamp in the header.
+     */
+    public function signTimestamped(string $timestamp, string $method, string $path, string $body = ''): string
+    {
+        $canonical = $timestamp . '.' . strtoupper($method) . $path . $body;
+
+        return hash_hmac('sha256', $canonical, $this->secretKey);
+    }
+
+    /**
      * @param  array<string, mixed>  $formFields
      * @param  array<int, string>  $fileHashes
      */
     public function signMultipart(string $method, string $path, array $formFields, array $fileHashes): string
+    {
+        return hash_hmac('sha256', $this->multipartCanonical($method, $path, $formFields, $fileHashes), $this->secretKey);
+    }
+
+    /**
+     * @param  array<string, mixed>  $formFields
+     * @param  array<int, string>  $fileHashes
+     */
+    public function signMultipartTimestamped(string $timestamp, string $method, string $path, array $formFields, array $fileHashes): string
+    {
+        $canonical = $timestamp . '.' . $this->multipartCanonical($method, $path, $formFields, $fileHashes);
+
+        return hash_hmac('sha256', $canonical, $this->secretKey);
+    }
+
+    /**
+     * @param  array<string, mixed>  $formFields
+     * @param  array<int, string>  $fileHashes
+     */
+    private function multipartCanonical(string $method, string $path, array $formFields, array $fileHashes): string
     {
         $fields = $this->canonicalizeArray($formFields);
         $serializedFields = http_build_query($fields, '', '&', PHP_QUERY_RFC3986);
 
         sort($fileHashes);
 
-        $canonical = strtoupper($method) . $path . "\n" . $serializedFields . "\n" . implode(',', $fileHashes);
-
-        return hash_hmac('sha256', $canonical, $this->secretKey);
+        return strtoupper($method) . $path . "\n" . $serializedFields . "\n" . implode(',', $fileHashes);
     }
 
     /**
