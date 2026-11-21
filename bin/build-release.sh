@@ -24,6 +24,16 @@ fi
 # --delete would remove a checkout's .svn metadata, so keep it.
 rsync -a --delete --exclude='.svn' --exclude-from="$root/.distignore" "$root"/ "$target"/
 
+# rsync never deletes what it excludes, so a file an earlier release shipped and .distignore now
+# lists (README.md went to trunk with the 0.3.0 plain rsync) would stay. Remove each listed top-level
+# entry from the target explicitly; this works with GNU rsync and macOS openrsync alike.
+while IFS= read -r entry || [ -n "$entry" ]; do
+    case "$entry" in
+        ''|'#'*|*/*|.|..|.svn) continue ;;
+    esac
+    rm -rf -- "${target:?}/$entry"
+done < "$root/.distignore"
+
 failed=0
 for leftover in tests vendor bin composer.json composer.lock phpunit.xml.dist .phpunit.cache .distignore .gitignore .git .github README.md; do
     if [ -e "$target/$leftover" ]; then
