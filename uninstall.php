@@ -15,6 +15,7 @@ if (! defined('PROOFAGE_WP_PLUGIN_VERSION')) {
 
 delete_option('proofage_age_verification_settings');
 \ProofAge\WordPress\Support\Connection::delete();
+delete_option(\ProofAge\WordPress\ProofAge\ApiClient::CLOCK_OFFSET_OPTION);
 
 global $wpdb;
 

@@ -1,0 +1,15 @@
+# Files that stay out of a release built from this repository.
+.git
+.github
+.gitignore
+.distignore
+.DS_Store
+.phpunit.cache
+composer.json
+composer.lock
+phpunit.xml.dist
+tests
+vendor
+node_modules
+README.md
+bin

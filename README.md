@@ -114,3 +114,9 @@ The current implementation includes focused Pest tests for:
 ## License
 
 The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+
+## Development
+
+- `composer install` then `composer test` runs the PHPUnit suite. It needs no WordPress: `tests/bootstrap.php` stubs the few WordPress functions the API client uses.
+- `tests/fixtures/hmac-vectors.json` is copied byte for byte from the ProofAge PHP SDK (`resources/hmac-vectors.json`). Copy it again when the signing rules change.
+- To make a release, run `bin/build-release.sh <target-dir>` (for example the svn `trunk`). It copies the plugin with `rsync --delete`, leaves out what `.distignore` lists (tests, `vendor`, Composer files, `bin`) and fails if any of them is still there. Do not rsync the repository by hand: that would ship PHPUnit. The script never runs svn.
